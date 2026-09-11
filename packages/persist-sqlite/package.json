@@ -1,0 +1,31 @@
+{
+  "name": "@evixor/persist-sqlite",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "license": "MIT",
+  "description": "Single-threaded SQLite persist layer for Evixor.",
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.11.1"
+  },
+  "devDependencies": {
+    "@evixor/evixor-runtime": "workspace:*",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^20.0.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.0.0"
+  }
+}
