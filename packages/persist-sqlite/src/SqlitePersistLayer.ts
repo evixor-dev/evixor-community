@@ -13,7 +13,7 @@
   parsePipelineId,
   randomIdForDev,
   restoreCtx,
-  PipelineIdToString,
+  pipelineIdToString,
   zeroLastThreeDigits,
 } from "@evixor/evixor-runtime"
 import { SqliteStore } from "./sqliteStore"
@@ -74,8 +74,8 @@ export class SqlitePersistLayer implements PersistLayer {
     }
 
     if (parentCtx) {
-      const childId = PipelineIdToString(child)
-      const parentId = PipelineIdToString(parentCtx.PipelineId)
+      const childId = pipelineIdToString(child)
+      const parentId = pipelineIdToString(parentCtx.pipelineId)
 
       const row = this.store.db.prepare("SELECT subpipelines FROM payloads WHERE id = ?").get(parentId) as { subpipelines: string } | undefined
       if (row) {
@@ -88,10 +88,10 @@ export class SqlitePersistLayer implements PersistLayer {
     return child
   }
 
-  async saveCtx(PipelineId: PipelineId, ctx: EvixorCtx): Promise<void> {
-    const id = PipelineIdToString(PipelineId)
+  async saveCtx(pipelineId: PipelineId, ctx: EvixorCtx): Promise<void> {
+    const id = pipelineIdToString(pipelineId)
     const ctxData: EvixorCtxData = {
-      PipelineId: ctx.PipelineId,
+      pipelineId: ctx.pipelineId,
       pipeline: ctx.pipeline,
       startTime: ctx.startTime,
       meta: ctx.meta,
@@ -112,23 +112,23 @@ export class SqlitePersistLayer implements PersistLayer {
         updatedAt = excluded.updatedAt,
         lifecycleStatus = excluded.lifecycleStatus
     `).run(
-      id, PipelineId.rootId, PipelineId.pipeline,
-      PipelineId.timestamp, ctx.meta.lifecycleStatus ?? "pending",
+      id, pipelineId.rootId, pipelineId.pipeline,
+      pipelineId.timestamp, ctx.meta.lifecycleStatus ?? "pending",
       Date.now(), JSON.stringify(ctxData),
     )
 
     this.store.db.prepare(`
       UPDATE timeline SET status = 'submitted'
-      WHERE PipelineId = ? AND status = 'pending'
+      WHERE pipelineId = ? AND status = 'pending'
     `).run(id)
   }
 
-  async loadCtx(PipelineId: PipelineId, options?: EvixorRunOptions): Promise<EvixorCtx | null> {
-    const id = PipelineIdToString(PipelineId)
+  async loadCtx(pipelineId: PipelineId, options?: EvixorRunOptions): Promise<EvixorCtx | null> {
+    const id = pipelineIdToString(pipelineId)
 
     this.store.db.prepare(`
       UPDATE timeline SET status = 'discard'
-      WHERE PipelineId = ? AND status = 'pending'
+      WHERE pipelineId = ? AND status = 'pending'
     `).run(id)
 
     const row = this.store.db.prepare("SELECT ctx FROM workflows WHERE id = ?").get(id) as { ctx: string } | undefined
@@ -136,13 +136,13 @@ export class SqlitePersistLayer implements PersistLayer {
     let ctxData: EvixorCtxData
     if (!row) {
       const payload = await this.loadPayload(id)
-      if (!payload || payload.pipeline !== PipelineId.pipeline) {
+      if (!payload || payload.pipeline !== pipelineId.pipeline) {
         return null
       }
       ctxData = await createCtx({
-        PipelineId,
-        pipeline: PipelineId.pipeline,
-        startTime: PipelineId.timestamp,
+        pipelineId,
+        pipeline: pipelineId.pipeline,
+        startTime: pipelineId.timestamp,
         payload: payload.payload,
         options,
       })
@@ -182,10 +182,20 @@ export class SqlitePersistLayer implements PersistLayer {
 
     for (const wf of workflowRows) {
       if (!["done", "abort", "timeout", "error", "doneWithContinue"].includes(wf.lifecycleStatus)) {
+        const ctx = await this.loadCtx(parsePipelineId(wf.id))
+        if (ctx && ctx.control.continue?.type === "subpipeline" && ctx.control.continue?.pipelineId) {
+          const childCtx = await this.loadCtx(parsePipelineId(ctx.control.continue.pipelineId))
+          if (!childCtx || !childCtx.meta.lifecycleStatus || (childCtx.meta.lifecycleStatus !== "done" && childCtx.meta.lifecycleStatus !== "doneWithContinue" && childCtx.meta.lifecycleStatus !== "error" && childCtx.meta.lifecycleStatus !== "timeout" && childCtx.meta.lifecycleStatus !== "abort")) {
+            continue
+          }
+        }
         return parsePipelineId(wf.id)
       }
       if (wf.lifecycleStatus === "doneWithContinue" && wf === workflowRows[0]) {
-        return parsePipelineId(wf.id)
+        const ctx = await this.loadCtx(parsePipelineId(wf.id))
+        if (!ctx?.control.continue?.pipelineId) {
+          return parsePipelineId(wf.id)
+        }
       }
     }
 
@@ -236,8 +246,8 @@ export class SqlitePersistLayer implements PersistLayer {
   }
 
   async submitTimelineItem(ctx: EvixorCtx, item: TimelineItem): Promise<void> {
-    const PipelineIdStr = PipelineIdToString(ctx.PipelineId)
-    const nextTs = this.nextTimestamp(ctx.PipelineId.rootId)
+    const PipelineIdStr = pipelineIdToString(ctx.pipelineId)
+    const nextTs = this.nextTimestamp(ctx.pipelineId.rootId)
     item.timestamp = nextTs
 
     const id = `${PipelineIdStr}:${nextTs}`
@@ -246,7 +256,7 @@ export class SqlitePersistLayer implements PersistLayer {
       this.store.db.prepare(`
         INSERT INTO timeline (id, PipelineId, rootId, pipeline, timestamp, createdAt, item, status)
         VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
-      `).run(id, PipelineIdStr, ctx.PipelineId.rootId, ctx.PipelineId.pipeline, nextTs, Date.now(), JSON.stringify(item))
+      `).run(id, PipelineIdStr, ctx.pipelineId.rootId, ctx.pipelineId.pipeline, nextTs, Date.now(), JSON.stringify(item))
     } catch {
       // ignore duplicate
     }
@@ -257,7 +267,7 @@ export class SqlitePersistLayer implements PersistLayer {
 
     const items = this.store.db.prepare(`
       SELECT item, timestamp, status FROM timeline
-      WHERE PipelineId = ?
+      WHERE pipelineId = ?
       ORDER BY timestamp ASC
       LIMIT 2000
     `).all(PipelineIdStr) as { item: string; timestamp: number; status: string }[]
@@ -267,15 +277,15 @@ export class SqlitePersistLayer implements PersistLayer {
     const workflowRow = this.store.db.prepare("SELECT lifecycleStatus FROM workflows WHERE id = ?").get(PipelineIdStr) as { lifecycleStatus: string } | undefined
 
     return {
-      PipelineId: pid,
+      pipelineId: pid,
       createdAt: pid.timestamp,
       items: items.map(r => ({ ...JSON.parse(r.item) as TimelineItem, status: r.status })),
       lifecycleStatus: workflowRow?.lifecycleStatus,
     }
   }
 
-  async markPipelineLifecycle(PipelineId: PipelineId, lifecycleStatus: "done" | "doneWithContinue" | "abort" | "timeout" | "error" | "pending"): Promise<void> {
-    const id = PipelineIdToString(PipelineId)
+  async markPipelineLifecycle(pipelineId: PipelineId, lifecycleStatus: "done" | "doneWithContinue" | "abort" | "timeout" | "error" | "pending"): Promise<void> {
+    const id = pipelineIdToString(pipelineId)
     try {
       const row = this.store.db.prepare("SELECT ctx FROM workflows WHERE id = ?").get(id) as { ctx: string } | undefined
       if (row) {
@@ -333,7 +343,7 @@ export class SqlitePersistLayer implements PersistLayer {
     const timelineRows = this.store.db.prepare(`
       SELECT PipelineId, item, timestamp, status FROM timeline
       WHERE rootId = ?
-    `).all(rootId) as { PipelineId: string; item: string; timestamp: number; status: string }[]
+    `).all(rootId) as { pipelineId: string; item: string; timestamp: number; status: string }[]
 
     if (timelineRows.length === 0) return []
 
@@ -346,14 +356,14 @@ export class SqlitePersistLayer implements PersistLayer {
     const grouped = new Map<string, TimelineMeta>()
 
     for (const row of timelineRows) {
-      const pidStr = row.PipelineId
+      const pidStr = row.pipelineId
       const ti = JSON.parse(row.item) as TimelineItem
       const itemWithStatus = { ...ti, status: row.status }
 
       let meta = grouped.get(pidStr)
       if (!meta) {
         meta = {
-          PipelineId: ti.PipelineId,
+          pipelineId: ti.pipelineId,
           createdAt: ti.timestamp ?? Date.now(),
           items: [],
           lifecycleStatus: statusMap.get(pidStr),
@@ -393,11 +403,11 @@ export class SqlitePersistLayer implements PersistLayer {
   async listPendingSubpipelineParents(): Promise<{ rootId: string; parentPipelineId: string; childPipelineId: string }[]> {
     const rows = this.store.db.prepare(`
       SELECT id AS parentPipelineId, rootId,
-             json_extract(ctx, '$.control.continue.PipelineId') AS childPipelineId
+             json_extract(ctx, '$.control.continue.pipelineId') AS childPipelineId
       FROM workflows
       WHERE lifecycleStatus = 'pending'
         AND json_extract(ctx, '$.control.continue.type') = 'subpipeline'
-        AND json_extract(ctx, '$.control.continue.PipelineId') IS NOT NULL
+        AND json_extract(ctx, '$.control.continue.pipelineId') IS NOT NULL
     `).all() as { rootId: string; parentPipelineId: string; childPipelineId: string }[]
 
     return rows
@@ -430,15 +440,15 @@ export class SqlitePersistLayer implements PersistLayer {
     return arr
   }
 
-  async getPendingInputsSessionId(PipelineId: PipelineId): Promise<string> {
-    const currentId = PipelineIdToString(PipelineId)
-    const currentPipeline = PipelineId.pipeline
+  async getPendingInputsSessionId(pipelineId: PipelineId): Promise<string> {
+    const currentId = pipelineIdToString(pipelineId)
+    const currentPipeline = pipelineId.pipeline
 
     try {
       const rows = this.store.db.prepare(`
         SELECT id, subpipelines FROM payloads
-        WHERE json_extract(PipelineId, '$.rootId') = ?
-      `).all(PipelineId.rootId) as { id: string; subpipelines: string }[]
+        WHERE json_extract(pipelineId, '$.rootId') = ?
+      `).all(pipelineId.rootId) as { id: string; subpipelines: string }[]
 
       const parentOf = new Map<string, string>()
       for (const r of rows) {
@@ -448,22 +458,22 @@ export class SqlitePersistLayer implements PersistLayer {
         }
       }
 
-      let ts = PipelineId.timestamp
+      let ts = pipelineId.timestamp
       let childId = currentId
       while (true) {
         const parentId = parentOf.get(childId)
         if (!parentId) break
 
         const parentWid = parsePipelineId(parentId)
-        if (parentpid.pipeline !== currentPipeline) break
+        if (parentWid.pipeline !== currentPipeline) break
 
-        ts = parentpid.timestamp
+        ts = parentWid.timestamp
         childId = parentId
       }
 
       return `${currentId}:${ts}`
     } catch {
-      return `${currentId}:${PipelineId.timestamp}`
+      return `${currentId}:${pipelineId.timestamp}`
     }
   }
 
@@ -474,7 +484,7 @@ export class SqlitePersistLayer implements PersistLayer {
         VALUES (?, ?, ?, ?)
       `).run(rootId, pipeline, JSON.stringify(drops), Date.now())
     } catch {
-      // Row already exists 鈥?already enqueued
+      // Row already exists — already enqueued
     }
   }
 
@@ -509,11 +519,11 @@ export class SqlitePersistLayer implements PersistLayer {
   }
 
   async loadPayload(PipelineIdStr: string): Promise<InitPayload | null> {
-    const row = this.store.db.prepare("SELECT payload, pipeline, PipelineId FROM payloads WHERE id = ?").get(PipelineIdStr) as { payload: string; pipeline: string; PipelineId: string } | undefined
+    const row = this.store.db.prepare("SELECT payload, pipeline, PipelineId FROM payloads WHERE id = ?").get(PipelineIdStr) as { payload: string; pipeline: string; pipelineId: string } | undefined
     if (!row) return null
 
     return {
-      PipelineId: JSON.parse(row.PipelineId) as PipelineId,
+      pipelineId: JSON.parse(row.pipelineId) as PipelineId,
       pipeline: row.pipeline,
       payload: JSON.parse(row.payload),
     }

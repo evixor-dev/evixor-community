@@ -24,7 +24,6 @@ export class SqliteStore {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS workflows (
         id TEXT PRIMARY KEY,
-        tenantId TEXT NOT NULL,
         rootId TEXT NOT NULL,
         pipeline TEXT NOT NULL,
         timestamp INTEGER NOT NULL,
@@ -36,8 +35,7 @@ export class SqliteStore {
 
       CREATE TABLE IF NOT EXISTS timeline (
         id TEXT PRIMARY KEY,
-        tenantId TEXT NOT NULL,
-        PipelineId TEXT NOT NULL,
+        pipelineId TEXT NOT NULL,
         rootId TEXT NOT NULL,
         pipeline TEXT NOT NULL,
         timestamp INTEGER NOT NULL,
@@ -48,13 +46,11 @@ export class SqliteStore {
 
       CREATE TABLE IF NOT EXISTS pending_inputs (
         id TEXT PRIMARY KEY,
-        tenantId TEXT NOT NULL,
         inputs TEXT NOT NULL DEFAULT '[]'
       );
 
       CREATE TABLE IF NOT EXISTS subpipeline_returns (
         id TEXT PRIMARY KEY,
-        tenantId TEXT NOT NULL,
         pipeline TEXT NOT NULL,
         drops TEXT NOT NULL DEFAULT '[]',
         timestamp INTEGER NOT NULL
@@ -62,29 +58,26 @@ export class SqliteStore {
 
       CREATE TABLE IF NOT EXISTS payloads (
         id TEXT PRIMARY KEY,
-        tenantId TEXT NOT NULL,
         pipeline TEXT NOT NULL,
         bootstrap INTEGER NOT NULL DEFAULT 0,
         blobKey TEXT,
         payload TEXT,
-        PipelineId TEXT NOT NULL,
+        pipelineId TEXT NOT NULL,
         subpipelines TEXT NOT NULL DEFAULT '[]'
       );
 
       CREATE TABLE IF NOT EXISTS locks (
         id TEXT PRIMARY KEY,
-        tenantId TEXT NOT NULL,
         lockedBy TEXT NOT NULL,
         expiresAt INTEGER NOT NULL,
         missedEvent INTEGER NOT NULL DEFAULT 0
       );
 
       CREATE INDEX IF NOT EXISTS idx_workflows_rootId ON workflows(rootId);
-      CREATE INDEX IF NOT EXISTS idx_workflows_tenantId ON workflows(tenantId);
       CREATE INDEX IF NOT EXISTS idx_workflows_lifecycle ON workflows(rootId, lifecycleStatus);
-      CREATE INDEX IF NOT EXISTS idx_timeline_PipelineId ON timeline(PipelineId);
+      CREATE INDEX IF NOT EXISTS idx_timeline_pipelineId ON timeline(pipelineId);
       CREATE INDEX IF NOT EXISTS idx_timeline_rootId ON timeline(rootId);
-      CREATE INDEX IF NOT EXISTS idx_payloads_bootstrap ON payloads(tenantId, bootstrap);
+      CREATE INDEX IF NOT EXISTS idx_payloads_bootstrap ON payloads(bootstrap);
     `)
 
     this.migrateTimelineStatus()
