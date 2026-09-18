@@ -1,0 +1,7 @@
+__azurite_data__/
+__azurite_db_*.json
+__blobstorage__/
+__queuestorage__/
+AzuriteConfig
+data/
+dist/
