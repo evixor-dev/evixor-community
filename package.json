@@ -6,6 +6,10 @@
   "license": "MIT",
   "description": "Open-source edition of Evixor infra.",
   "workspaces": [
-    "packages/*"
-  ]
+    "packages/*",
+    "demos/*"
+  ],
+  "scripts": {
+    "build": "pnpm -r build"
+  }
 }

@@ -24,6 +24,13 @@ We believe that a well-crafted base implementation, combined with modern AI tool
 | Package | Description |
 |---------|-------------|
 | [`@evixor/persist-sqlite`](./packages/persist-sqlite) | Single-threaded SQLite persistence layer — ideal for local development, embedded deployments, and as a reference for building your own `PersistLayer` |
+| [`@evixor/hostlayer-azure`](./packages/hostlayer-azure) | Azure Functions host layer — HTTP triggers and Storage Queue trigger for Evixor workflows |
+
+## Demos
+
+| Demo | Description |
+|------|-------------|
+| [`demos/azure`](./demos/azure) | Azure Functions demo — run Evixor workflows locally with Azure Functions Core Tools |
 
 ### Roadmap
 
@@ -45,6 +52,38 @@ const hostLayer = new InMemoryHostLayer(persistLayer, pipelineRegistry)
 
 const pipelineId = await startWorkflow("my-pipeline", payload, {}, persistLayer, hostLayer)
 await hostLayer.doLoop({})
+```
+
+## Quick Start: Azure Functions Demo
+
+### Prerequisites
+
+- Node.js 18+
+- pnpm
+- Azure Functions Core Tools v4: `npm install -g azure-functions-core-tools@4`
+- Azurite: `npm install -g azurite`
+
+### Setup
+
+```bash
+git clone https://github.com/xxx/evixor-community.git
+cd evixor-community
+pnpm install
+pnpm build
+```
+
+### Run
+
+```bash
+# Terminal 1: Start Azurite (Azure Storage emulator)
+npx azurite --skipApiVersionCheck
+
+# Terminal 2: Start Azure Functions
+cd demos/azure
+func start
+
+# Terminal 3: Run CLI
+pnpm cli start math '{"a": 10, "b": 5}'
 ```
 
 ## Contributing

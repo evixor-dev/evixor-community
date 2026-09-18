@@ -1,0 +1,7 @@
+packages:
+  - packages/*
+  - demos/*
+
+onlyBuiltDependencies:
+  - better-sqlite3
+  - esbuild

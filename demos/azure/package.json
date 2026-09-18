@@ -1,0 +1,25 @@
+{
+  "name": "@evixor/demo-azure",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "start": "func start",
+    "cli": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "@evixor/evixor-runtime": "^1.0.0",
+    "@evixor/persist-sqlite": "workspace:*",
+    "@evixor/hostlayer-azure": "workspace:*",
+    "@azure/storage-queue": "^12.31.0"
+  },
+  "devDependencies": {
+    "@azure/functions": "^4.16.5",
+    "@types/node": "^20.19.43",
+    "azurite": "^3.37.0",
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.3"
+  }
+}
