@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "license": "MIT",
-  "description": "Open-source edition of Evixor infra.",
+  "description": "Open-source community packages for Evixor.",
   "workspaces": [
     "packages/*",
     "demos/*"

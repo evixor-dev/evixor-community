@@ -2,6 +2,8 @@
 
 A ready-to-run demo that executes [Evixor](https://evixor.org) pipelines on a local Azure Functions instance. Includes two sample pipelines — **math** (multi-step arithmetic with subpipeline call) and **fibonacci** (iterative loop) — and outputs a timeline JSON you can paste into [evixor.org](https://evixor.org) to visualize the execution as an interactive Gantt chart.
 
+> **Note:** This demo uses SQLite as the persist layer for simplicity, which is **not suitable for production serverless deployments**. For real deployments on Azure, Cloudflare Workers, AWS Lambda, or other serverless platforms, use a production-grade persist layer such as PostgreSQL or PostgreSQL + Redis. See `@evixor/persist-sqlite` for a reference implementation that you can adapt to your own environment.
+
 ## Prerequisites
 
 | Tool | Install | Notes |
